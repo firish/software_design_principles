@@ -12,4 +12,4 @@ The game might involve:
 - A Door can connect two rooms, allowing the player to move between them.
 - A Wall blocks the way.
 
-![Maze Schema]('images/creational_pattern_maze_schema.png')
+![Maze Schema](./images/creational_pattern_maze_schema.png)
