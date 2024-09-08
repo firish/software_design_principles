@@ -52,3 +52,115 @@ Use the **Abstract Factory** pattern when:
 
 #### Summary
 The **Abstract Factory** pattern is all about providing a consistent way to create related objects, such as UI components, without specifying their exact classes. It allows systems to switch between different families of objects (like different themes or styles) easily while maintaining consistency. However, adding new product types can be challenging because you need to modify the factory interface and all its subclasses.
+
+
+# Applying the Abstract Factory pattern to the Maze Game
+
+In this section, we apply the **Abstract Factory** pattern to create mazes in a more flexible way. 
+The `MazeFactory` class is used to create the components of a maze (rooms, walls, doors). 
+This factory approach allows us to create different kinds of mazes, such as enchanted mazes or bombed mazes, by simply swapping out the factory that builds the components.
+
+The `MazeFactory` class is responsible for creating the maze components, such as rooms, walls, and doors. 
+It allows flexibility by letting programs specify which types of rooms, walls, and doors to construct, rather than hard-coding these details into the maze creation process.
+
+```python
+class MazeFactory:
+    def make_maze(self):
+        return Maze()
+
+    def make_wall(self):
+        return Wall()
+
+    def make_room(self, n):
+        return Room(n)
+
+    def make_door(self, r1, r2):
+        return Door(r1, r2)
+```
+This MazeFactory class can be used in programs to create different mazes. For example, you might have a program that reads a maze plan from a file and uses MazeFactory to build the maze based on that plan. 
+
+Here’s an updated version of the maze creation function that uses the MazeFactory as a parameter. This allows us to specify which factory to use (standard, enchanted, bombed, etc.):
+```python
+class MazeGame:
+    def create_maze(self, factory):
+        a_maze = factory.make_maze()
+        r1 = factory.make_room(1)
+        r2 = factory.make_room(2)
+        a_door = factory.make_door(r1, r2)
+
+        a_maze.add_room(r1)
+        a_maze.add_room(r2)
+
+        r1.set_side("North", factory.make_wall())
+        r1.set_side("East", a_door)
+        r1.set_side("South", factory.make_wall())
+        r1.set_side("West", factory.make_wall())
+
+        r2.set_side("North", factory.make_wall())
+        r2.set_side("East", factory.make_wall())
+        r2.set_side("South", factory.make_wall())
+        r2.set_side("West", a_door)
+
+        return a_maze
+```
+Here, the function takes a MazeFactory object as a parameter and uses it to create the maze components (rooms, walls, doors). The flexibility comes from the fact that you can easily pass in different factories to create different kinds of mazes.
+
+
+EnchantedMazeFactory:
+If we want to create an enchanted maze (a maze with magical components), we can subclass the MazeFactory to create an EnchantedMazeFactory. This factory will override certain methods to return enchanted rooms and doors that require spells to open.
+```python
+class EnchantedMazeFactory(MazeFactory):
+
+    __magic_spell = "Abra_ka_dabra"
+
+    def make_room(self, n):
+        return EnchantedRoom(n, self.cast_spell())
+
+    def make_door(self, r1, r2):
+        return DoorNeedingSpell(r1, r2)
+
+    def cast_spell(self):
+        return __magic_spell
+```
+Here, we’ve overridden the make_room and make_door methods to return enchanted versions of the room and door. The cast_spell() method simulates casting a spell that is required to open the magical doors.
+
+
+BombedMazeFactory:
+If we want to create a bombed maze (a maze where rooms can have bombs and walls can be damaged), we can create another subclass, BombedMazeFactory, which overrides methods to create bombed rooms and damaged walls.
+```python
+class BombedMazeFactory(MazeFactory):
+    def make_wall(self):
+        return BombedWall()
+
+    def make_room(self, n):
+        return RoomWithABomb(n)
+```
+This factory ensures that the maze will be made up of RoomWithABomb objects and BombedWall objects. These special components will track the damage done when a bomb goes off.
+
+
+#### Creating Different Mazes
+To create a maze with different components, we simply call the create_maze method with the appropriate factory:
+```python
+# Creating a bombed maze
+game = MazeGame()
+bombed_factory = BombedMazeFactory()
+bombed_maze = game.create_maze(bombed_factory)
+
+# Creating an enchanted maze
+enchanted_factory = EnchantedMazeFactory()
+enchanted_maze = game.create_maze(enchanted_factory)
+```
+By passing different factory objects (BombedMazeFactory or EnchantedMazeFactory) to the create_maze method, we can easily create different kinds of mazes without modifying the core logic.
+
+
+#### Key Insights
+1.
+MazeFactory is just a collection of factory methods. Each method (make_maze, make_room, make_wall, make_door) is responsible for creating a different part of the maze.
+EnchantedMazeFactory and BombedMazeFactory are subclasses of MazeFactory that override specific methods to return different types of components (e.g., enchanted rooms, bombed walls).
+This pattern allows us to easily switch between different types of mazes by passing different factories to the maze creation function.
+
+2.
+In the original maze creation function, we hard-coded the class names for rooms, walls, and doors. This made it difficult to change the maze components. By using the Abstract Factory pattern, we can remove those hard-coded class names and instead rely on a factory to produce the correct objects. This makes it easy to create new kinds of mazes with different components, such as enchanted mazes or bombed mazes, without rewriting the maze creation logic.
+
+Conclusion
+By using the Abstract Factory pattern, we can easily create different kinds of mazes by swapping out the factory used to create the components. This makes the code more flexible and modular, allowing us to create enchanted mazes, bombed mazes, or any other type of maze simply by changing the factory that is passed to the create_maze method.
