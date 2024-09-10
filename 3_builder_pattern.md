@@ -1,4 +1,4 @@
-### Builder Pattern 
+# Builder Pattern 
 
 Definition: 
 The **Builder** pattern is used to **separate the construction** of a complex object from its representation, meaning that the same process can create different representations of an object. 
@@ -137,3 +137,172 @@ reader = RTFReader(tex_builder)
 reader.parse(rtf_text)
 print(tex_builder.get_result())  # Outputs TeX-formatted text
 ```
+
+
+# Applying the Builder Pattern to the Maze Example
+
+The **Builder** pattern can be applied to our maze example to separate the construction process from the maze's internal representation. 
+By using this pattern, we can build different kinds of mazes without changing the maze creation process.
+The **Builder** pattern provides flexibility by allowing us to use different builders that can construct different kinds of mazes.
+
+
+The **MazeBuilder** class defines an interface for building different parts of a maze. It includes methods to:
+
+1. Build the maze itself.
+2. Build rooms with specific room numbers.
+3. Build doors between two rooms.
+
+Each of these methods does nothing by default, allowing subclasses of `MazeBuilder` to override only the methods they need.
+
+```python
+class MazeBuilder:
+    def build_maze(self):
+        pass
+
+    def build_room(self, room):
+        pass
+
+    def build_door(self, room_from, room_to):
+        pass
+
+    def get_maze(self):
+        return None
+```
+
+We can modify the CreateMaze function in the MazeGame class to use a builder object for constructing the maze. The builder handles the construction, while the MazeGame class simply calls the builder's methods to build the maze. The MazeGame acts as a driver here. 
+
+```python
+class MazeGame:
+    def create_maze(self, builder):
+        builder.build_maze()
+        builder.build_room(1)
+        builder.build_room(2)
+        builder.build_door(1, 2)
+        return builder.get_maze()
+```
+This version of CreateMaze is much more flexible because the builder hides the internal representation of the maze (how rooms, doors, and walls are created). This means you can change the maze's representation without modifying the game logic.
+
+The StandardMazeBuilder is a concrete implementation of the MazeBuilder class. 
+It builds simple mazes by creating rooms and doors and keeping track of the maze being built.
+```python
+class StandardMazeBuilder(MazeBuilder):
+    def __init__(self):
+        self._current_maze = None
+
+    def build_maze(self):
+        self._current_maze = Maze()
+
+    def get_maze(self):
+        return self._current_maze
+
+    def build_room(self, n):
+        if not self._current_maze.room_no(n):
+            room = Room(n)
+            self._current_maze.add_room(room)
+            room.set_side("North", Wall())
+            room.set_side("South", Wall())
+            room.set_side("East", Wall())
+            room.set_side("West", Wall())
+
+    def build_door(self, n1, n2):
+        r1 = self._current_maze.room_no(n1)
+        r2 = self._current_maze.room_no(n2)
+        door = Door(r1, r2)
+        r1.set_side(self.common_wall(r1, r2), door)
+        r2.set_side(self.common_wall(r2, r1), door)
+
+    def common_wall(self, r1, r2):
+        direction = "East" # Logic to determine the common wall direction (could be E, N, S, W)
+        return direction
+```
+The builder keeps track of the maze it's constructing (_current_maze) and provides utility functions like common_wall to handle relationships between rooms.
+```python
+game = MazeGame()
+builder = StandardMazeBuilder()
+game.create_maze(builder)
+maze = builder.get_maze()
+```
+
+We could similarly have builders for building enchanted, or bombed rooms.
+```python
+class EnchantedRoom(Room):
+    def __init__(self, room_number, spell):
+        super().__init__(room_number)
+        self._spell = spell
+
+class DoorNeedingSpell(Door):
+    def __init__(self, room1, room2):
+        super().__init__(room1, room2)
+        self._spell_required = True
+
+class EnchantedMazeBuilder(MazeBuilder):
+    def __init__(self):
+        self._current_maze = None
+
+    def build_maze(self):
+        self._current_maze = Maze()
+
+    def get_maze(self):
+        return self._current_maze
+
+    def build_room(self, n):
+        if not self._current_maze.room_no(n):
+            room = EnchantedRoom(n, self.cast_spell())
+            self._current_maze.add_room(room)
+            room.set_side("North", Wall())
+            room.set_side("South", Wall())
+            room.set_side("East", Wall())
+            room.set_side("West", Wall())
+
+    def build_door(self, n1, n2):
+        r1 = self._current_maze.room_no(n1)
+        r2 = self._current_maze.room_no(n2)
+        door = DoorNeedingSpell(r1, r2)
+        r1.set_side(self.common_wall(r1, r2), door)
+        r2.set_side(self.common_wall(r2, r1), door)
+
+    def common_wall(self, r1, r2):
+        # Logic to determine the common wall direction
+        return "East"
+
+    def cast_spell(self):
+        return "Magic Spell"
+
+game = MazeGame()
+builder = EnchantedMazeBuilder()
+game.create_maze(builder)
+enchanted_maze = builder.get_maze()
+
+```
+
+We can create a more exotic builder like CountingMazeBuilder. This builder doesn’t create a maze but counts the number of rooms and doors that would have been created. It shows how the builder pattern can be used for purposes other than constructing objects.
+```python
+class CountingMazeBuilder(MazeBuilder):
+    def __init__(self):
+        self._rooms = 0
+        self._doors = 0
+
+    def build_room(self, n):
+        self._rooms += 1
+
+    def build_door(self, n1, n2):
+        self._doors += 1
+
+    def get_counts(self):
+        return self._rooms, self._doors
+
+game = MazeGame()
+builder = CountingMazeBuilder()
+game.create_maze(builder)
+rooms, doors = builder.get_counts()
+print(f"The maze has {rooms} rooms and {doors} doors")
+
+```
+This builder doesn’t create any objects—it just counts them. It’s a perfect example of how flexible the builder pattern can be.
+
+*(IMPORTANT)*
+The primary difference is that the Builder pattern focuses on constructing a complex object step by step. Abstract Factory's emphasis is on families of product objects
+
+
+
+
