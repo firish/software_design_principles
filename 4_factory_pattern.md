@@ -105,7 +105,7 @@ class Application:
         doc = self.create_document()
         print(doc.open())
 
-DefaultApplication: This is the ConcreteCreator. It overrides the create_document() method to create a Default instance.
+# DefaultApplication: This is the ConcreteCreator. It overrides the create_document() method to create a Default instance.
 # Concrete Creator
 class DefaultApplication(Application):
     def create_document(self):
@@ -117,3 +117,149 @@ app.open_document()
 ```
 
 This pattern promotes flexibility and makes it easier to add new product types without changing existing code.
+
+
+
+## Applying the Factory Method Pattern to Maze Creation Example
+
+In this section, we will refactor the maze creation process to use the **Factory Method** pattern. 
+This approach will allow us to avoid hard-coding the specific classes for the maze, rooms, walls, and doors. 
+Instead, we'll use factory methods to let subclasses decide which components to create.
+
+
+### **Defining the MazeGame Class**
+
+We start with the `MazeGame` class, 
+which will contain the methods for creating various maze components. The class has factory methods for creating the maze, rooms, walls, and doors.
+
+- A product is made at the factory
+- The concrete products define the actual product
+- The creator is the factory
+- The concrete creators are the factory methods
+  
+```python
+# product
+class Maze:
+    def add_room(self, room):
+        # Code to add a room to the maze
+        pass
+
+# concrete product
+class Room:
+    def __init__(self, number):
+        self.number = number
+
+    def set_side(self, direction, wall_or_door):
+        # Code to set a side of the room
+        pass
+
+# concrete product
+class Wall:
+    pass
+
+# concrete product
+class Door:
+    def __init__(self, room1, room2):
+        # Code to create a door between two rooms
+        pass
+
+# creator
+class MazeGame:
+    def create_maze(self):
+        maze = self.make_maze()  # Uses factory method to create a maze
+        room1 = self.make_room(1)  # Uses factory method to create room 1
+        room2 = self.make_room(2)  # Uses factory method to create room 2
+        door = self.make_door(room1, room2)  # Uses factory method to create a door
+        
+        maze.add_room(room1)  # Add room 1 to the maze
+        maze.add_room(room2)  # Add room 2 to the maze
+        room1.set_side("North", self.make_wall())  # Set North side for room 1
+        room1.set_side("East", door)  # Set East side for room 1
+        room1.set_side("South", self.make_wall())  # Set South side for room 1
+        room1.set_side("West", self.make_wall())  # Set West side for room 1
+        
+        room2.set_side("North", self.make_wall())  # Set North side for room 2
+        room2.set_side("East", self.make_wall())  # Set East side for room 2
+        room2.set_side("South", self.make_wall())  # Set South side for room 2
+        room2.set_side("West", door)  # Set West side for room 2
+
+        return maze  # Return the created maze
+
+    # Concrete Creator
+    def make_maze(self):
+        return Maze()  # Factory method to create a Maze
+
+    # Concrete Creator
+    def make_room(self, number):
+        return Room(number)  # Factory method to create a Room
+
+    # Concrete Creator
+    def make_wall(self):
+        return Wall()  # Factory method to create a Wall
+
+    # Concrete Creator
+    def make_door(self, room1, room2):
+        return Door(room1, room2)  # Factory method to create a Door
+```
+Creating a Maze: The create_maze method uses these factory methods to create the maze structure. 
+
+Factory Methods: The methods make_maze, make_room, make_wall, and make_door are factory methods that return instances of the respective components. By using these methods, we avoid hard-coding the specific classes for the maze components.
+
+
+Now that our base class is set up (product) (here, it is Maze()), 
+we can create subclasses (concrete products) that customize the maze components. 
+For example, an EnchantedMazeGame (Creator) can override the factory methods (concrete creators) to create enchanted versions of rooms and walls.
+```python
+# Concrete Product
+class EnchantedRoom(Room):
+    def __init__(self, number, spell):
+        super().__init__(number)
+        self.spell = spell  # Additional attribute for enchantment
+
+# Concrete Product
+class DoorNeedingSpell(Door):
+    def __init__(self, room1, room2):
+        super().__init__(room1, room2)
+        # Additional code for a door that requires a spell
+
+# Enchanted Maze Game
+class EnchantedMazeGame(MazeGame):
+    # super lets me use MazeGame's create_maze
+    super().__init__()
+
+    # Override the factory methods to create enchanted components
+    def make_maze(self):
+        return Maze()
+
+    def make_room(self, number):
+        return EnchantedRoom(number, self.cast_spell())  # Creates an enchanted room
+
+    def make_door(self, room1, room2):
+        return DoorNeedingSpell(room1, room2)  # Creates a door that requires a spell
+
+    def cast_spell(self):
+        return "Magic Spell"  # Spell for the enchanted room
+```
+
+I can switch between the two as following
+```python
+# Client code
+def create_regular_maze():
+    regular_game = MazeGame()  # Create a regular maze game
+    maze = regular_game.create_maze()  # Build the regular maze
+    return maze
+
+def create_enchanted_maze():
+    enchanted_game = EnchantedMazeGame()  # Create an enchanted maze game
+    maze = enchanted_game.create_maze()  # Build the enchanted maze
+    return maze
+
+# Example usage
+regular_maze = create_regular_maze()
+enchanted_maze = create_enchanted_maze()
+
+start_game(maze_type) # where I can start the game with regular_maze or enchanted_maze
+```
+        
+
+
