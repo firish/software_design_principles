@@ -195,7 +195,72 @@ print(singleton_a1 is singleton_b1)  # Outputs: False
 # This allows for extensibility while maintaining the Singleton property.
 ```
 
+### Real World Examples
+1. Logger: A logging class where only one instance should handle logging throughout the application.
+2. Configuration Manager: A class that manages configuration settings, ensuring consistency across the application.
+```python
+# Logger
+class Logger(metaclass=SingletonMeta):
+    def log(self, message):
+        print(f"[LOG]: {message}")
+
+# Usage
+logger1 = Logger()
+logger2 = Logger()
+
+logger1.log("This is a log message.")  # Outputs: [LOG]: This is a log message.
+print(logger1 is logger2)  # Outputs: True
+
+# ---------------------------------
+
+# Config Manager
+class ConfigManager(metaclass=SingletonMeta):
+    def __init__(self):
+        self.settings = {}
+
+    def set(self, key, value):
+        self.settings[key] = value
+
+    def get(self, key):
+        return self.settings.get(key, None)
+
+# Usage
+config1 = ConfigManager()
+config2 = ConfigManager()
+
+config1.set('theme', 'dark')
+print(config2.get('theme'))  # Outputs: dark
+```
 
 
+## BORG Pattern (Derived from Singleton)
+An alternative to the Singleton pattern is the Borg pattern, which ensures that all instances share the same state.
+
+```python
+class Borg:
+    _shared_state = {}  # Attribute dictionary
+
+    def __init__(self):
+        self.__dict__ = self._shared_state  # Make instance share the same state
+
+class MySingleton(Borg):
+    def __init__(self):
+        super().__init__()
+        if not hasattr(self, 'initialized'):
+            print("Initializing the singleton instance.")
+            self.initialized = True
+        else:
+            print("Using the existing singleton instance.")
+
+# Usage
+singleton1 = MySingleton()
+singleton2 = MySingleton()
+
+singleton1.value = 10
+print(singleton2.value)  # Outputs: 10
+print(singleton1 is singleton2)  # Outputs: False
+
+# Note: All instances share the same state (_shared_state), but they are different objects.
+```
 
 
