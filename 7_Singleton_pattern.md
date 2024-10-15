@@ -130,7 +130,7 @@ print(singleton1 is singleton2)  # Outputs: True
 
 
 ### Pros/Cons of different approaches
-
+```text
 1. private constructor
 Pros:
 Simplicity: Easy to understand and implement.
@@ -161,7 +161,7 @@ Cons:
 Complexity: Metaclasses can be difficult to understand and may confuse unfamiliar developers.
 Potential for Errors: Misuse of metaclasses can lead to hard-to-debug issues.
 Overkill for Simple Cases. 
-
+```
 
 # Consideration while Threading
 Thread Safety: In a multithreaded environment, care must be taken to ensure that only one instance is created even when multiple threads are trying to create one simultaneously.
