@@ -129,6 +129,40 @@ print(singleton1 is singleton2)  # Outputs: True
 - Variable Number of Instances: While Singleton enforces one instance, the pattern can be modified to control the number of instances (e.g., a pool of instances).
 
 
+### Pros/Cons of different approaches
+
+1. private constructor
+Pros:
+Simplicity: Easy to understand and implement.
+Encapsulation: Controls instantiation within the class itself.
+No External Dependencies: Doesn't rely on external wrappers or metaclasses.
+
+Cons:
+Not Truly Private: Python's naming conventions are not enforced, so the constructor isn't truly private.
+Subclassing Issues: Can be harder to extend or subclass.
+Global State: Uses May lead to issues in multi-threaded environments without proper synchronization.
+
+2. Wrapper functions
+Pros:
+Flexibility: This can be applied to any class via decoration. Simply decorate the class to make it a singleton.
+Separation of Concerns: Singleton logic is separated from the class definition.
+
+Cons:
+Obscures Class Definition: The singleton behavior isn't evident from the class itself.
+May Break Subclassing: Decorating subclasses requires care to maintain singleton behavior.
+Instance Check Complexity: The wrapper must handle instance storage and access, which can become complex.
+
+3. Metaclasses
+Pros:
+Centralized Control: Singleton logic is centralized in the metaclass.
+Transparency: Classes don't need to change their implementation to become singletons.
+Supports Inheritance: Subclasses can also be singletons if desired.
+Cons:
+Complexity: Metaclasses can be difficult to understand and may confuse unfamiliar developers.
+Potential for Errors: Misuse of metaclasses can lead to hard-to-debug issues.
+Overkill for Simple Cases. 
+
+
 # Consideration while Threading
 Thread Safety: In a multithreaded environment, care must be taken to ensure that only one instance is created even when multiple threads are trying to create one simultaneously.
 Solution: Use locks or other synchronization mechanisms.
