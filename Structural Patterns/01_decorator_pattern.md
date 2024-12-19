@@ -215,3 +215,30 @@ if __name__ == "__main__":
     treasure_room.enter()  # Enters room 2, finds treasure
     treasure_room.enter()  # Treasure already taken
 ```
+
+
+### How is this different from the traditional approach
+
+The important difference is what we're creating classes for and how they're used, not just how many classes exist.
+
+#### Traditional Inheritance Approach (Without Decorators)
+If you wanted different kinds of rooms with different behaviors using just inheritance, you might create:
+`TrapRoom`
+`TreasureRoom`
+Maybe later you want a `TrapTreasureRoom` (a room with both a trap and treasure).
+That would lead to a growing number of subclasses. For each new feature or combination, you’d create a new subclass. Over time, this could explode into a large number of classes.
+
+#### Decorator Approach
+With decorators, we still create classes for each new feature, but these classes aren’t subclasses of Room; 
+they are decorators that can be attached to any MapSite (room, door, etc.).
+Instead of creating a `TrapRoom`, we create a `TrapDecorator` that can wrap a Room.
+The key difference: Decorators can be combined dynamically and applied to many different components without creating new subclasses.
+For example:
+To get a room with a trap: Wrap the Room with a `TrapDecorator`.
+To get a room with treasure: Wrap the Room with a `TreasureDecorator`.
+To get a room with both a trap and treasure: Wrap the Room first with a TrapDecorator and then wrap that with a TreasureDecorator (or vice versa). You don't need a new TrapTreasureRoom class.
+
+#### Why This Is Better
+ - Flexibility: Instead of a subclass for every possible combination (Trap+Treasure, Trap+Treasure+AnotherFeature, etc.), you just combine decorators as needed.
+ - Reusability: `TrapDecorator` can be used on any MapSite (rooms, doors, etc.), and TreasureDecorator can do the same. You don’t have to write `TreasureDoor`, `TreasureWall`, `TrapDoor`, `TrapWall`, etc. Just wrap the original objects in the decorators.
+- Reduced Class Explosion: Yes, you create decorator classes for new features, but you don’t need separate subclasses for every combination of features and base classes. Two decorators can be combined in multiple ways. If you add a third decorator (say `HealingDecorator`), you can combine it with TrapDecorator and TreasureDecorator in any configuration, all without creating new subclasses.
