@@ -144,5 +144,7 @@ class LibraryService:
     def remove_book(self, book_id):
         self.repository.delete(book_id)
 ```
+LibraryService uses the repository to manage books. Notice it does not contain any code about how the books are stored.
+This concept would typically be extended to manage the inventory of the books. 
 
 
