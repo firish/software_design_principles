@@ -145,3 +145,95 @@ class CircuitBreaker:
         # If CLOSED, we allow the request
         return True
 ```
+
+External Payment Gateway (Stub)
+Assume that Amazon uses the same gateway API and during Thanksgiving, their service is overloaded, and can fail due to the traffic.
+```python
+import random
+
+class ExternalPaymentGateway:
+    @staticmethod
+    def process_payment(amount):
+        """
+        Simulate a payment call that can fail or succeed randomly.
+        We'll say there's a 10% chance of failure for demonstration.
+        """
+        fail_chance = 0.10
+        if random.random() < fail_chance:
+            # Simulate failure
+            raise ConnectionError("Payment gateway is unreachable or responded with an error.")
+        # Simulate success
+        return "PAYMENT_SUCCESS"
+```
+
+PaymentService with CircuitBreaker
+We wrap calls to ExternalPaymentGateway.process_payment inside a circuit breaker logic.
+```python
+class PaymentService:
+    def __init__(self, circuit_breaker: CircuitBreaker):
+        self.circuit_breaker = circuit_breaker
+
+    def pay(self, amount):
+        # Check if we're allowed to call the external service
+        if not self.circuit_breaker.allow_request():
+            print("[PaymentService] Circuit is OPEN or HALF-OPEN limit reached. Failing fast.")
+            return "PAYMENT_FAILED_FAST"
+
+        try:
+            result = ExternalPaymentGateway.process_payment(amount)
+            print(f"[PaymentService] Payment processed successfully, amount={amount}")
+            self.circuit_breaker.record_success()
+            return result
+        except ConnectionError as e:
+            print(f"[PaymentService] Payment failed: {e}")
+            self.circuit_breaker.record_failure()
+            return "PAYMENT_FAILED"
+```
+
+Running a mock test with circuit breaker
+```python
+def main():
+    # Create a circuit breaker with:
+    # - 3 consecutive failures to open the circuit
+    # - 5 seconds recovery timeout
+    # - 1 test call in half-open
+    circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=5, max_half_open_calls=1)
+    payment_service = PaymentService(circuit_breaker)
+
+    # Simulate multiple payment attempts
+    for i in range(10):
+        amount = 100 + i * 10
+        print(f"\nAttempting payment of ${amount} ...")
+        result = payment_service.pay(amount)
+        print(f"Payment result: {result}")
+
+        # Sleep 1 second between calls to see circuit breaker transitions
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
+```
+
+```text
+Attempting payment of $100 ...
+[PaymentService] Payment processed successfully, amount=100
+[CircuitBreaker] State changed to CLOSED. Service considered healthy.
+Payment result: PAYMENT_SUCCESS
+
+Attempting payment of $110 ...
+[PaymentService] Payment failed: Payment gateway ...
+[CircuitBreaker] State changed to OPEN. Will refuse calls until after recovery timeout.
+Payment result: PAYMENT_FAILED
+...
+
+Attempting payment of $120 ...
+[PaymentService] Circuit is OPEN ... Failing fast.
+Payment result: PAYMENT_FAILED_FAST
+...
+
+... after 5 seconds ...
+[CircuitBreaker] State changed to HALF_OPEN. Testing service ...
+[PaymentService] Payment processed successfully ...
+[CircuitBreaker] State changed to CLOSED. ...
+Payment result: PAYMENT_SUCCESS
+```
