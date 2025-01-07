@@ -36,6 +36,7 @@ class MediaPlayer(abc.ABC):
     def play_audio(self, file_name: str):
         pass
 ```
+
 - `MediaPlayer` is an interface (abstract class in Python) with a single method `play_audio`.  
 - Clients only know about this interface and call `play_audio(file_name)`.  
 </br>
@@ -50,6 +51,7 @@ class Mp3Player(MediaPlayer):
         else:
             print(f"[Mp3Player] Error: Unable to play file {file_name}, not an MP3!")
 ```
+
 - `Mp3Player` implements `MediaPlayer`.  
 - It only knows how to play `.mp3` files, returning an error for other formats.  
 </br>
@@ -75,7 +77,7 @@ class AdvancedMediaPlayer:
 ```python
 class MediaAdapter(MediaPlayer):
     """
-    Adapter that implements the MediaPlayer interface and internally
+    An adapter that implements the MediaPlayer interface and internally
     uses an AdvancedMediaPlayer to handle non-MP3 formats.
     """
     def __init__(self, advanced_player: AdvancedMediaPlayer):
@@ -116,6 +118,7 @@ class AudioPlayer:
         else:
             self.adapter.play_audio(file_name)
 
+# Client Code
 def main():
     player = AudioPlayer()
     # Use the same AudioPlayer to handle different formats
@@ -156,13 +159,3 @@ def main():
 2. **Complexity**: If you have many different interfaces to adapt, you might end up with multiple adapters.  
 </br>
 
----
-
-## Summary</br>
-- The **Adapter** is a **structural** pattern that **converts** the interface of a class into **another** interface the client expects.  
-- In the **Media Player** example, we overcame the mismatch between a simple `MediaPlayer` interface and an `AdvancedMediaPlayer` by wrapping the advanced class in a `MediaAdapter`.  
-- This approach allows **seamless** integration of older or external code (adaptee) into a new system with minimal changes.  
-</br>
-
-Enjoy applying the Adapter pattern to gracefully handle **incompatible interfaces** in your Python applications!
-```
