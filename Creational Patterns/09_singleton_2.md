@@ -1,4 +1,4 @@
-```markdown
+
 # Singleton Pattern</br>
 
 **Singleton** is one of the classic **creational** design patterns.
