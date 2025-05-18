@@ -102,6 +102,7 @@ class PaymentProcessorFactory:
         provider = os.getenv("PAYMENT_PROVIDER", "dummy").lower()
         try:
             ctor = cls._registry[provider]
+            # In object-oriented programming, "ctor" is a common abbreviation for constructor
         except KeyError as exc:
             raise ValueError(f"Unsupported payment provider: {provider}") from exc
         
