@@ -136,3 +136,29 @@ d.show()
 # Class D
 # Class A
 ```
+
+
+
+Addition:
+```python
+
+class Employee:
+    def weekly_hours(self):         # <-- ordinary instance method
+        return 40                   # “full-time” default
+
+class PartTimeEmployee(Employee):
+    def weekly_hours(self):
+        full = super().weekly_hours()   # call parent version
+        return full // 2                # work half as much
+```
+
+When you write PartTimeEmployee(Employee), you are subclassing Employee.
+Because of that relationship, PartTimeEmployee inherits everything that is not re-defined—attributes, instance methods, class methods.
+
+Inside the override, super().weekly_hours() lets you reuse or extend the parent logic without re-implementing it.
+If you never overrode weekly_hours, PartTimeEmployee would still have that method precisely because it inherits it.
+
+Then super()—why bother?
+- Works even if the superclass changes name or your class gets inserted in a deeper hierarchy.
+- Handles multiple inheritance correctly by following Python’s method-resolution order (MRO).
+So super() is the idiomatic, future-proof way to “extend then specialize” parent behavior.
