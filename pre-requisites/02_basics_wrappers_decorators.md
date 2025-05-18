@@ -5,6 +5,10 @@ enhancing or modifying its behavior without changing the function itself.
 In Python, this is commonly achieved using decorators.
 This is extremely important from the point of view of extensibility of applications. 
 
+Simply:
+In Python, the leading @ simply means “take the thing that follows and pass it through a decorator before Python stores it.” 
+A decorator is just a function that receives another function or class, adds or changes behavior, and hands back a new (or modified) object.
+
 ### Common use cases
 - Logging: Automatically log function calls and results.
 - Access Control: Enforce user authentication or permissions before executing a function.
