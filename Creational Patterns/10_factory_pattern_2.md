@@ -55,6 +55,7 @@ class PaymentProcessor(abc.ABC):
     
     @abc.abstractmethod
     def charge(self, *, amount_cents: int, currency: str, token: str) -> str:
+        #  Keyword-Only Arguments: A bare asterisk * in the parameter list signifies that all parameters following it must be specified as keyword arguments when the function is called.
         """Returns a provider-specific charge ID or raises an exception."""
         raise NotImplementedError
 
