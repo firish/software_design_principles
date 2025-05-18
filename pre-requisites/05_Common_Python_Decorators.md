@@ -61,3 +61,60 @@ print(emp)        # Employee(name='Jamal', start=datetime.date(...), hourly_rate
 If PartTimeEmployee later subclasses Employee, 
 calling PartTimeEmployee.from_weekly_salary(...) will return a PartTimeEmployee, 
 because cls refers to the class that received the call, not the one in which the method was first defined.
+
+
+# How is classmethod actually different from a regular inherited super method?
+
+Regular method (with super) - Reuse or extend existing behavior that lives in a parent - “Run the next implementation up the MRO chain, then add or tweak something.”
+classmethod - Create new behavior that must work for every subclass in a polymorphic way (most often: alternative constructors) - “Give the class that calls me (cls), not an instance, so I can build/modify/return the right kind of object.”
+
+```Python
+import math
+
+class Shape:
+    def __init__(self): ...
+    
+    # ❌ WRONG: tries to be an “area constructor” using super()
+    # (super() only gives us the *parent* implementation; it has no idea
+    # which subclass is calling or how to manufacture it.)
+    def from_area(area):
+        r = math.sqrt(area / math.pi)
+        return ShapeCircle(r)          # hard-coded → always a circle!
+
+class ShapeCircle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+
+class ShapeSquare(Shape):
+    def __init__(self, side):
+        self.side = side
+
+
+# ---- Calling ----
+sq = ShapeSquare.from_area_wrong(25)   # caller *wanted* a square
+print(type(sq))                        # → <class '__main__.ShapeCircle'>
+
+self only exists after an object has been built, so you can’t inspect self.type (or any other instance attribute) to decide what class to build—there is no instance yet.
+The factory’s entire job is to create that very first instance; until it finishes, self is impossible to reference.
+```
+
+However, you can use classmethod
+```Python
+class Shape:
+    @classmethod
+    def from_area(cls, area):
+        """Polymorphic, works for every subclass."""
+        if cls is ShapeCircle:
+            r = math.sqrt(area / math.pi)
+            return cls(r)
+        if cls is ShapeSquare:
+            side = math.sqrt(area)
+            return cls(side)
+        raise NotImplementedError
+
+class ShapeCircle(Shape): ...
+class ShapeSquare(Shape): ...
+
+sq = ShapeSquare.from_area(25)
+print(type(sq))                        # → <class '__main__.ShapeSquare'>
+```
