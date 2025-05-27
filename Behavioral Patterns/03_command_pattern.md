@@ -51,3 +51,110 @@ Hence you must choose a concrete encoding—a serialization format—that both t
 - Choose where retries and idempotency checks live—inside the command or in the executor.
 - Finally, keep the Invoker thin; orchestration policies (delivery guarantees, scheduling, back-off, tracing) belong in a separate command bus layer.
 
+
+### Practical example
+
+Modern SaaS back-ends off-load slow work—sending email, resizing images, generating PDF invoices—to background workers so that the HTTP response returns quickly. 
+Each unit of work is a command placed on a queue; one or more worker processes pop commands and execute them.
+
+```python
+"""
+$ python job_queue.py
+→ Pushed 3 commands onto the queue
+→ Worker executes: ResizeImageCommand(path='assets/photo.jpg', size=(800, 600))
+   Resizing assets/photo.jpg to (800, 600) ...
+→ Worker executes: SendEmailCommand(to='alice@example.com', subject='Welcome!')
+   Sending email to alice@example.com ...
+→ Worker executes: GenerateInvoicePDFCommand(order_id=1234)
+   Generating PDF invoice for order 1234 ...
+"""
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, asdict
+import json
+from queue import SimpleQueue        # stand-in for Redis / SQS
+
+# ---------- Command infrastructure ----------
+
+class Command(ABC):
+    """Abstract base class every job must implement."""
+    
+    @abstractmethod
+    def execute(self) -> None: ...
+
+    # optional: payload for persistence / transport
+    def serialize(self) -> str:
+        return json.dumps({"type": self.__class__.__name__, "data": asdict(self)})
+
+    @staticmethod
+    def deserialize(payload: str) -> "Command":
+        registry = {cls.__name__: cls for cls in Command.__subclasses__()}
+        obj = json.loads(payload)
+        return registry[obj["type"]](**obj["data"])
+
+# ---------- Concrete commands ----------
+
+@dataclass
+class ResizeImageCommand(Command):
+    path: str
+    size: tuple[int, int]
+
+    def execute(self):
+        print(f"   Resizing {self.path} to {self.size} ...")
+
+@dataclass
+class SendEmailCommand(Command):
+    to: str
+    subject: str
+    body: str = ""
+
+    def execute(self):
+        print(f"   Sending email to {self.to} ...")
+
+@dataclass
+class GenerateInvoicePDFCommand(Command):
+    order_id: int
+
+    def execute(self):
+        print(f"   Generating PDF invoice for order {self.order_id} ...")
+
+# ---------- Simple in-memory queue (invoker) ----------
+
+class JobQueue:
+    def __init__(self):
+        self._q = SimpleQueue()
+
+    def push(self, cmd: Command):
+        self._q.put(cmd.serialize())
+
+    def pop(self) -> Command | None:
+        if self._q.empty():
+            return None
+        return Command.deserialize(self._q.get())
+
+# ---------- Worker loop (receiver) ----------
+
+def worker_loop(job_queue: JobQueue):
+    while (cmd := job_queue.pop()) is not None:
+        print(f"→ Worker executes: {cmd}")
+        cmd.execute()
+
+# ---------- Demonstration ----------
+
+if __name__ == "__main__":
+    q = JobQueue()
+
+    # web layer enqueues jobs
+    q.push(ResizeImageCommand("assets/photo.jpg", (800, 600)))
+    q.push(SendEmailCommand("alice@example.com", "Welcome!"))
+    q.push(GenerateInvoicePDFCommand(1234))
+    print("→ Pushed 3 commands onto the queue")
+
+    # a separate worker process (simulated here) consumes them
+    worker_loop(q)
+
+```
+This example showcases:
+- Loose coupling: the HTTP handler never imports SendEmailCommand; it just pushes a serialized job onto the queue.
+- Durability and retries: because each command is JSON-serialised, the queue could be Redis, RabbitMQ, or AWS SQS, and a worker can retry the same payload after a crash.
+- Extensibility: adding a PostToSlackCommand means writing one dataclass; no changes to the queue or worker code.
