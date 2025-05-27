@@ -27,6 +27,19 @@ Because requests are now first-class objects they can be:
 - They make undo/redo natural because each command can know how to reverse itself.
 - Testing becomes easier: you feed a command to an executor and assert on side-effects.
 
+Note:
+When Python (or any language) creates an object, that object lives inside the interpreter’s memory—it is made of pointers, type flags, and OS-specific addresses that have meaning only inside that single process. 
+Serialization is the act of turning that in-memory object into a stream of bytes (or a text string) that can be:
+- Stored on disk, in a database, or in a message queue
+- Sent over a pipe, socket, or HTTP request to another process—perhaps running on a different machine or even written in another language
+- The reverse operation: rebuilding a live object from that byte sequence—is called deserialization (or “unmarshalling”).
+
+Note:
+Your commands like, ResizeImageCommand, SendEmailCommand, etc. are not going to be executed immediately in the same Python interpreter that created them. 
+Instead they will be put on a queue (Redis, SQS, Kafka…), read by a different worker process, and only then executed.
+Because two different processes are involved, the command object must travel as inert data—no live pointers, no open file handles.
+Hence you must choose a concrete encoding—a serialization format—that both the producer and the consumer understand.
+
 ### Disadvantages
 - Turning every operation into an object introduces boilerplate.
 - Each concrete command usually needs its own class.
