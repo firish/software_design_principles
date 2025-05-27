@@ -158,3 +158,164 @@ This example showcases:
 - Loose coupling: the HTTP handler never imports SendEmailCommand; it just pushes a serialized job onto the queue.
 - Durability and retries: because each command is JSON-serialised, the queue could be Redis, RabbitMQ, or AWS SQS, and a worker can retry the same payload after a crash.
 - Extensibility: adding a PostToSlackCommand means writing one dataclass; no changes to the queue or worker code.
+
+
+Advanced, with undo,
+```python
+"""
+job_queue_topics.py
+-----------------------------------
+Demonstrates:
+  • Topic-based routing: each worker subscribes to specific command types.
+  • Per-worker undo stack.
+"""
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, asdict
+from collections import defaultdict
+from queue import SimpleQueue
+import json
+import time
+
+# ──────────────────  Command infrastructure  ──────────────────
+class Command(ABC):
+    """Every concrete job must implement execute() *and* undo()."""
+
+    @abstractmethod
+    def execute(self) -> None: ...
+    @abstractmethod
+    def undo(self) -> None: ...
+
+    # ——— Serialization helpers (JSON for language-agnostic wire format) ———
+    def serialize(self) -> str:
+        return json.dumps({"type": self.__class__.__name__, "data": asdict(self)})
+
+    @staticmethod
+    def deserialize(payload: str) -> "Command":
+        registry = {cls.__name__: cls for cls in Command.__subclasses__()}
+        obj = json.loads(payload)
+        return registry[obj["type"]](**obj["data"])
+
+# ──────────────────  Concrete commands  ──────────────────
+@dataclass
+class ResizeImageCommand(Command):
+    path: str
+    size: tuple[int, int]
+
+    def execute(self):
+        print(f"🖼️  Resizing {self.path} to {self.size} ...")
+        # record “old size” for undo (simulated)
+        time.sleep(0.1)
+        self._old_size = (1920, 1080)
+
+    def undo(self):
+        print(f"↩️  Reverting {self.path} back to {self._old_size} ...")
+
+@dataclass
+class SendEmailCommand(Command):
+    to: str
+    subject: str
+    body: str = ""
+
+    def execute(self):
+        print(f"✉️  Sending email to {self.to!r} with subject '{self.subject}'")
+        time.sleep(0.1)
+
+    def undo(self):
+        print(f"⚠️  Cannot unsend email to {self.to!r} — logging compensation action")
+
+@dataclass
+class GenerateInvoicePDFCommand(Command):
+    order_id: int
+
+    def execute(self):
+        print(f"📄 Generating PDF invoice for order {self.order_id}")
+        time.sleep(0.1)
+        self._filepath = f"invoices/{self.order_id}.pdf"
+
+    def undo(self):
+        print(f"🗑️  Deleting generated file {self._filepath}")
+
+# ──────────────────  Topic-aware queue  ──────────────────
+class JobQueue:
+    """
+    Very small stand-in for a broker that supports *topics*.
+    One SimpleQueue per command type.
+    """
+    def __init__(self):
+        self._topics: dict[str, SimpleQueue[str]] = defaultdict(SimpleQueue)
+
+    def push(self, cmd: Command):
+        topic = cmd.__class__.__name__
+        self._topics[topic].put(cmd.serialize())
+
+    def pop(self, topics: list[str]) -> Command | None:
+        """
+        Try each subscribed topic in order; return first available command.
+        """
+        for t in topics:
+            q = self._topics[t]
+            if not q.empty():
+                return Command.deserialize(q.get())
+        return None
+
+# ──────────────────  Worker  ──────────────────
+class Worker:
+    """
+    A worker subscribes to one or more topics (command classes) and
+    keeps its own undo stack for rollback capability.
+    """
+    worker_counter = 0
+
+    def __init__(self, queue: JobQueue, subscriptions: list[type[Command]]):
+        Worker.worker_counter += 1
+        self.id = Worker.worker_counter
+        self.queue = queue
+        self.subscribed_names = [cls.__name__ for cls in subscriptions]
+        self._undo_stack: list[Command] = []
+
+    def run_once(self):
+        cmd = self.queue.pop(self.subscribed_names)
+        if cmd:
+            print(f"\n▶️ Worker#{self.id} executing {cmd}")
+            cmd.execute()
+            self._undo_stack.append(cmd)
+
+    # Simple rollback of the last executed command
+    def rollback_last(self):
+        if self._undo_stack:
+            cmd = self._undo_stack.pop()
+            print(f"\n⏪ Worker#{self.id} rolling back {cmd}")
+            cmd.undo()
+        else:
+            print(f"Worker#{self.id} undo stack empty")
+
+# ──────────────────  Demo  ──────────────────
+if __name__ == "__main__":
+    queue = JobQueue()
+
+    # Simulate web/front-end layer enqueuing three different jobs
+    queue.push(ResizeImageCommand("assets/photo.jpg", (800, 600)))
+    queue.push(SendEmailCommand("alice@example.com", "Welcome!"))
+    queue.push(GenerateInvoicePDFCommand(1234))
+    print("📥 Pushed 3 jobs")
+
+    # Create *specialised* workers
+    img_worker   = Worker(queue, [ResizeImageCommand])
+    email_worker = Worker(queue, [SendEmailCommand])
+    pdf_worker   = Worker(queue, [GenerateInvoicePDFCommand])
+
+    # Pretend to be a simple scheduler: each worker polls once per tick
+    for _ in range(3):
+        img_worker.run_once()
+        email_worker.run_once()
+        pdf_worker.run_once()
+
+    # Roll back the last PDF generation
+    pdf_worker.rollback_last()
+```
+
+Each command’s class name acts as a topic key.
+When the front-end enqueues a job, the queue automatically drops it into self._topics["ResizeImageCommand"], ...["SendEmailCommand"], etc.
+Each worker subscribes to the topics it cares about; a photo-processing container never even sees email jobs, just like a real world systems.
+
