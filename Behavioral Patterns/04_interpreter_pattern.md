@@ -159,8 +159,160 @@ if __name__ == "__main__":
 ```
 
 
+### Incremental Updates
 
+Adding three useful features:
+- NOT operator:	NOT subject contains "promo"
+- startsWith comparison: from startsWith "sales@"
+- numeric comparisons:	size > 1_000_000 (bytes, here)
 
+```python
+"""
+mini_email_filter_v2.py
+────────────────────────
+Rule grammar now supports:
+  - AND, OR, NOT      (NOT has higher precedence than AND/OR)
+  - Comparisons:      ==, contains, startsWith, >, <, >=, <=
+  - Literals:         "quoted strings"  or  numbers
+
+No parentheses, still left-associative for AND/OR.
+
+Run this file to see a demo.
+"""
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Dict
+
+# ────────────────── Expression hierarchy ──────────────────
+Email = Dict[str, str | int]          # add 'size' (int) alongside strings
+
+class Expr(ABC):
+    @abstractmethod
+    def interpret(self, msg: Email) -> bool: ...
+
+class Condition(Expr):
+    """field op literal"""
+    def __init__(self, field, op, value_token):
+        self.field, self.op = field, op
+        # drop quotes if present
+        self.value_raw = value_token.strip('"')
+        # detect numeric literal once
+        self.value_num = None
+        try:
+            self.value_num = float(self.value_raw.replace('_', ''))
+        except ValueError:
+            pass                         # keep None for non-numeric
+
+    def _num(self, thing):
+        try:
+            return float(thing)
+        except (ValueError, TypeError):
+            return None
+
+    def interpret(self, msg):
+        hay = msg.get(self.field)
+
+        # Handle numeric > < >= <= if both sides numeric
+        if self.op in {">", "<", ">=", "<="}:
+            left = self._num(hay)
+            right = self.value_num
+            if left is None or right is None:
+                return False
+            if self.op == ">":  return left >  right
+            if self.op == "<":  return left <  right
+            if self.op == ">=": return left >= right
+            if self.op == "<=": return left <= right
+
+        # String ops (case-insensitive)
+        if not isinstance(hay, str):
+            return False
+        hay = hay.lower()
+        needle = self.value_raw.lower()
+
+        if self.op == "contains":    return needle in hay
+        if self.op == "startsWith":  return hay.startswith(needle)
+        if self.op == "==":          return hay == needle
+        return False                 # unknown op
+
+    def __repr__(self):
+        return f"({self.field} {self.op} {self.value_raw!r})"
+
+class And(Expr):
+    def __init__(self, l, r): self.l, self.r = l, r
+    def interpret(self, msg): return self.l.interpret(msg) and self.r.interpret(msg)
+    def __repr__(self):       return f"({self.l} AND {self.r})"
+
+class Or(Expr):
+    def __init__(self, l, r): self.l, self.r = l, r
+    def interpret(self, msg): return self.l.interpret(msg) or self.r.interpret(msg)
+    def __repr__(self):       return f"({self.l} OR {self.r})"
+
+class Not(Expr):
+    def __init__(self, e): self.e = e
+    def interpret(self, msg): return not self.e.interpret(msg)
+    def __repr__(self):       return f"(NOT {self.e})"
+
+# ──────────────────  Super-light parser  ──────────────────
+def parse(rule: str) -> Expr:
+    """
+    Grammar (EBNF-ish, left-associative):
+        expr   := term { (AND | OR) term }*
+        term   := [NOT] atom
+        atom   := ID op LITERAL
+    """
+    tokens = rule.split()
+    def next_tok(): return tokens.pop(0)
+
+    def parse_atom():
+        field = next_tok()
+        op    = next_tok()
+        lit   = next_tok()
+        return Condition(field, op, lit)
+
+    def parse_term():
+        if tokens and tokens[0] == "NOT":
+            next_tok()
+            return Not(parse_atom())
+        return parse_atom()
+
+    expr = parse_term()
+    while tokens:
+        conj = next_tok()              # AND / OR
+        rhs  = parse_term()
+        expr = And(expr, rhs) if conj == "AND" else Or(expr, rhs)
+    return expr
+
+# ────────────────── Demo  ──────────────────
+if __name__ == "__main__":
+    RULE = ('NOT subject contains "promo" AND '
+            'from startsWith "billing@" OR size > 1_000_000')
+
+    ast = parse(RULE)
+    print("Rule AST:", ast, "\n")
+
+    mails = [
+        # passes: meets size rule even though subject contains "promo"
+        {"subject": "great PROMO inside", "from": "sales@shop.com", "size": 2_500_000},
+        # fails: "promo" plus small size, wrong sender
+        {"subject": "promo deal",         "from": "marketing@shop.com", "size": 400_000},
+        # passes: from billing@, subject ok
+        {"subject": "Invoice April",      "from": "billing@shop.com", "size": 120_000},
+    ]
+
+    for i, m in enumerate(mails, 1):
+        res = "YES" if ast.interpret(m) else "NO"
+        print(f"Mail #{i} → label = {res}")
+
+"""
+Expected output
+---------------
+Rule AST: (((NOT (subject contains 'promo')) AND (from startsWith 'billing@')) OR (size > '1000000'))
+
+Mail #1 → label = YES
+Mail #2 → label = NO
+Mail #3 → label = YES
+"""
+```
 
 
 [COMPLEX]
