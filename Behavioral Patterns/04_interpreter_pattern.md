@@ -177,7 +177,6 @@ Rule grammar now supports:
 
 No parentheses, still left-associative for AND/OR.
 
-Run this file to see a demo.
 """
 from __future__ import annotations
 from abc import ABC, abstractmethod
