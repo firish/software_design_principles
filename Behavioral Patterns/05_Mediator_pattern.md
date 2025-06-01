@@ -57,12 +57,12 @@ from dataclasses import dataclass
 @dataclass
 class InventoryUpdate:
     def update_inventory(self, order_id: int):
-        print(f"📦  Updated Inventory after processing order {order_id}")
+        print(f"Updated Inventory after processing order {order_id}")
 
 @dataclass
 class InventoryService:
     def reserve_stock(self, order_id: int):
-        print(f"📦  Reserving items for order {order_id}")
+        print(f"Reserving items for order {order_id}")
         # Talks directly to class InventoryUpdate
         inv_update_service = InventoryUpdate()
         inv_update_service.update_inventory(order_id)
@@ -78,7 +78,7 @@ class PaymentService:
     notifier:  NotificationService
 
     def capture_payment(self, order_id: int, amount_cents: int, email: str):
-        print(f"💳  Captured ${amount_cents/100:.2f} for order {order_id}")
+        print(f"Captured ${amount_cents/100:.2f} for order {order_id}")
 
         # --- direct calls → hard coupling ---------------------
         self.inventory.reserve_stock(order_id)
