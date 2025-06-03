@@ -121,7 +121,131 @@ if __name__ == "__main__":
 ```
 
 Note:
-Encapsulation: only Game knows its schema; the .sav file is an opaque blob to the save manager.
-Portability: JSON keeps it human-debuggable yet could be swapped for a binary format later.
-Versioning: if the schema changes in v2 you can migrate old blobs inside _restore
+- Encapsulation: only Game knows its schema; the .sav file is an opaque blob to the save manager.
+- Portability: JSON keeps it human-debuggable yet could be swapped for a binary format later.
+- Versioning: if the schema changes in v2 you can migrate old blobs inside _restore
+
+
+A little more complex, but common example:
+A real-life text-editor buffer with undo/redo.
+
+
+Many SaaS products embed an inline rich-text editor that:
+- keeps an undo and redo stack,
+- saves a memento after each insert or delete,
+- supports unlimited history until a memory cap is hit,
+- never leaks the buffer’s internal list of lines.
+
+```python
+"""
+text_editor_memento.py
+──────────────────────
+$ python text_editor_memento.py
+(type lines, 'undo', 'redo', or 'quit')
+> hello
+> world
+> undo
+BUFFER NOW:
+hello
+> redo
+BUFFER NOW:
+hello
+world
+> quit
+"""
+
+from __future__ import annotations
+from collections import deque
+from dataclasses import dataclass
+import copy
+
+# ─────────── Memento — opaque value object ───────────
+@dataclass(frozen=True)
+class _TextMemento:
+    _lines_snapshot: tuple[str, ...]     # immutable copy
+
+# ─────────── Originator — the real editor buffer ─────
+class TextBuffer:
+    def __init__(self):
+        self._lines: list[str] = []
+
+    # public editing ops
+    def insert(self, line: str):
+        self._lines.append(line)
+
+    def delete_last(self):
+        if self._lines:
+            self._lines.pop()
+
+    # memento helpers
+    def _create_memento(self) -> _TextMemento:
+        # deep snapshot; tuple guarantees immutability
+        return _TextMemento(tuple(self._lines))
+
+    def _restore(self, mem: _TextMemento):
+        self._lines = list(mem._lines_snapshot)
+
+    # convenience for demo
+    def __str__(self): return "\n".join(self._lines)
+
+# ─────────── Caretaker — manages history stacks ──────
+class HistoryManager:
+    def __init__(self, originator: TextBuffer, max_steps: int | None = None):
+        self.originator = originator
+        self._undo: deque[_TextMemento] = deque()
+        self._redo: deque[_TextMemento] = deque()
+        self.max_steps = max_steps
+
+    def _save_checkpoint(self):
+        if self.max_steps and len(self._undo) >= self.max_steps:
+            self._undo.popleft()                # discard oldest
+        self._undo.append(self.originator._create_memento())
+        self._redo.clear()                      # new edit kills redo chain
+
+    # proxies that both act and snapshot
+    def insert(self, line: str):
+        self._save_checkpoint()
+        self.originator.insert(line)
+
+    def delete_last(self):
+        self._save_checkpoint()
+        self.originator.delete_last()
+
+    # navigation
+    def undo(self):
+        if not self._undo: return
+        self._redo.append(self.originator._create_memento())
+        self.originator._restore(self._undo.pop())
+
+    def redo(self):
+        if not self._redo: return
+        self._undo.append(self.originator._create_memento())
+        self.originator._restore(self._redo.pop())
+
+# ─────────── Demo CLI ─────────────────────────────────
+if __name__ == "__main__":
+    buf = TextBuffer()
+    history = HistoryManager(buf, max_steps=100)
+
+    while True:
+        cmd = input("> ")
+        if cmd == "quit":
+            break
+        elif cmd == "undo":
+            history.undo()
+            print("BUFFER NOW:\n" + str(buf))
+        elif cmd == "redo":
+            history.redo()
+            print("BUFFER NOW:\n" + str(buf))
+        elif cmd == "del":
+            history.delete_last()
+        else:
+            history.insert(cmd)
+```
+
+Note:
+- Encapsulation: TextBuffer alone knows it stores a _lines list; neither the CLI nor HistoryManager sees that detail.
+- Two-stack approach reproduces how VS Code and Google Docs implement undo/redo.
+- Memory cap via max_steps prevents runaway RAM. It is common in browsers.
+- Replacing full copies with rope diffs or text deltas would scale to megabyte documents
 
