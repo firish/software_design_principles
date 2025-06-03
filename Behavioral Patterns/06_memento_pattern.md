@@ -249,3 +249,112 @@ Note:
 - Memory cap via max_steps prevents runaway RAM. It is common in browsers.
 - Replacing full copies with rope diffs or text deltas would scale to megabyte documents
 
+
+Lastly, an example with delta encoding.
+Incremental “delta” memento for a drawing canvas.
+
+A vector-graphics editor wants dozens of undo steps without copying the whole scene each time.
+Instead of full snapshots, each memento stores only the delta (add / delete / move).
+Re-playing the stack reconstructs any past state.
+
+```python
+# canvas_delta_memento.py
+from dataclasses import dataclass
+from typing import List, Dict
+
+# ── 1.  Delta mementos ───────────────────────────────────────────
+@dataclass(frozen=True)
+class _AddShape:     id: str; shape: Dict
+@dataclass(frozen=True)
+class _DeleteShape:  id: str; prev_shape: Dict
+@dataclass(frozen=True)
+class _MoveShape:    id: str;  dx: int; dy: int
+
+Delta = _AddShape | _DeleteShape | _MoveShape
+
+# ── 2.  Originator: the Canvas ──────────────────────────────────
+class Canvas:
+    def __init__(self):
+        self._shapes: Dict[str, Dict] = {}   # id → {"x":..,"y":..,"type":..}
+
+    # editing API (each returns a Delta) --------------------------
+    def add(self, sid: str, shape: Dict) -> Delta:
+        self._shapes[sid] = shape.copy()
+        return _AddShape(sid, shape.copy())
+
+    def delete(self, sid: str) -> Delta:
+        old = self._shapes.pop(sid)
+        return _DeleteShape(sid, old)
+
+    def move(self, sid: str, dx: int, dy: int) -> Delta:
+        shp = self._shapes[sid]
+        shp["x"] += dx; shp["y"] += dy
+        return _MoveShape(sid, dx, dy)
+
+    # apply / revert a delta -------------------------------------
+    def _apply(self, d: Delta, reverse=False):
+        if isinstance(d, _AddShape):
+            if reverse:
+                self._shapes.pop(d.id, None)
+            else:
+                self._shapes[d.id] = d.shape.copy()
+        elif isinstance(d, _DeleteShape):
+            if reverse:
+                self._shapes[d.id] = d.prev_shape.copy()
+            else:
+                self._shapes.pop(d.id, None)
+        elif isinstance(d, _MoveShape):
+            sign = -1 if reverse else 1
+            shp = self._shapes[d.id]
+            shp["x"] += sign * d.dx
+            shp["y"] += sign * d.dy
+
+    # debugging helper
+    def dump(self): return dict(self._shapes)
+
+# ── 3.  Caretaker: two stacks of deltas ─────────────────────────
+class History:
+    def __init__(self, origin: Canvas):
+        self.o = origin
+        self._undo: List[Delta] = []
+        self._redo: List[Delta] = []
+
+    def _record(self, d: Delta):
+        self._undo.append(d)
+        self._redo.clear()
+
+    # proxy methods
+    def add(self, sid, shp):   self._record(self.o.add(sid, shp))
+    def delete(self, sid):     self._record(self.o.delete(sid))
+    def move(self, sid, dx, dy): self._record(self.o.move(sid, dx, dy))
+
+    # navigation
+    def undo(self):
+        if not self._undo: return
+        d = self._undo.pop()
+        self.o._apply(d, reverse=True)
+        self._redo.append(d)
+
+    def redo(self):
+        if not self._redo: return
+        d = self._redo.pop()
+        self.o._apply(d, reverse=False)
+        self._undo.append(d)
+
+# ── 4.  Demo ────────────────────────────────────────────────────
+if __name__ == "__main__":
+    c  = Canvas()
+    h  = History(c)
+
+    h.add("circle1", {"type":"circle","x":0,"y":0,"r":30})
+    h.move("circle1", 50, 10)
+    h.add("rect1",   {"type":"rect","x":5,"y":5,"w":40,"h":20})
+    print("Scene:", c.dump())          # both shapes present
+
+    h.undo(); h.undo()                 # undo add-rect and move-circle
+    print("After two undos:", c.dump())# only circle at original spot
+
+    h.redo()
+    print("After redo:", c.dump())     # circle moved again
+
+```
