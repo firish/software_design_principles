@@ -88,7 +88,3 @@ class EmailNotifier:
 - **EmailNotifier** — outbound messaging
 
 Switching to a NoSQL store or an AWS SES email gateway touches only the corresponding class. Tests for discount logic no longer need a database or SMTP server, boosting reliability and speed.
-
----
-
-Ready for the next letter in SOLID? Let me know when you'd like to dive into **O — Open/Closed Principle**!
